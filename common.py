@@ -37,3 +37,28 @@ def compute_metrics(y_true, y_pred, y_score) -> dict:
 def positive_scores(model, X):
     """Probability of class 1 (all five pipelines expose predict_proba)."""
     return model.predict_proba(X)[:, 1]
+
+
+def explain_winner(comp: pd.DataFrame, churn_rate: float) -> str:
+    """Plain-language reasoning for the model ranking (markdown), built from live results."""
+    ranked = comp.sort_values("MCC", ascending=False)
+    best, runner = ranked.index[0], ranked.index[1]
+    b = comp.loc[best]
+    lines = [
+        f"**Why {best} comes out on top for this upload**",
+        f"- Only {churn_rate:.1%} of customers churn, so a model that predicts *'stays'* for everybody "
+        f"would already score {1 - churn_rate:.1%} accuracy while finding no churners. "
+        f"Accuracy alone therefore cannot pick the winner.",
+        f"- MCC is used as the main yardstick because it combines true/false positives *and* negatives "
+        f"and stays low unless both classes are handled well (0 = guessing, 1 = perfect).",
+        f"- {best}: MCC {b['MCC']:.3f}, F1 {b['F1']:.3f}. It finds {b['Recall']:.0%} of the churners and "
+        f"{b['Precision']:.0%} of the customers it flags really do leave. "
+        f"Runner-up: {runner} (MCC {ranked.loc[runner, 'MCC']:.3f}).",
+    ]
+    top_recall = comp["Recall"].idxmax()
+    if top_recall != best:
+        lines.append(
+            f"- Trade-off: {top_recall} has the highest recall ({comp.loc[top_recall, 'Recall']:.0%}) "
+            f"but only {comp.loc[top_recall, 'Precision']:.0%} precision, i.e. many retention offers "
+            f"would go to customers who were never going to leave.")
+    return "\n".join(lines)
