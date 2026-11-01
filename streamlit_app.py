@@ -12,11 +12,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve
 
-from common import TARGET, MODEL_FILES, clean_columns, compute_metrics, positive_scores
+from common import (TARGET, MODEL_FILES, clean_columns, compute_metrics,
+                    positive_scores, explain_winner)
 
 st.set_page_config(page_title="Telecom Churn Classifier Lab", page_icon="📉", layout="wide")
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+REPO_URL = "https://github.com/ak05537/ml_assignment"
+UCI_URL = "https://archive.ics.uci.edu/dataset/563/iranian+churn+dataset"
 
 
 @st.cache_resource
@@ -39,11 +42,23 @@ st.sidebar.download_button("⬇️ Download sample test_data.csv",
                            load_sample().to_csv(index=False).encode(),
                            file_name="test_data.csv", mime="text/csv")
 
+with st.sidebar.expander("📂 Data & code links"):
+    st.markdown(f"- [Full source dataset (GitHub)]({REPO_URL}/blob/main/data/Customer_Churn.csv)\n"
+                f"- [Test split used here]({REPO_URL}/blob/main/test_data.csv)\n"
+                f"- [UCI dataset page]({UCI_URL})\n"
+                f"- [Source code]({REPO_URL})")
+
 # ---------------------------------------------------------------- header
 st.title("📉 Telecom Customer Churn - Model Comparison")
 st.write("Iranian telecom dataset · 5 classifiers trained offline "
          "(Logistic Regression, Decision Tree, KNN, Naive Bayes, SVM). "
          "Upload test data to evaluate any saved model - nothing is retrained here.")
+
+with st.expander("ℹ️ About this project"):
+    st.markdown("**Task:** predict whether a telecom subscriber will churn within the 12-month window, "
+                "using 13 usage/account features aggregated over the first 9 months (3,150 customers, "
+                "15.7% churners). Models were trained offline on an 80% stratified split; this app only "
+                "scores the data you upload.")
 
 if uploaded is None:
     st.info("👈 Upload a test CSV in the sidebar (or download the sample and re-upload it).")
@@ -86,13 +101,13 @@ tab1, tab2, tab3, tab4 = st.tabs(["Confusion matrix", "Classification report",
 with tab1:
     c1, c2 = st.columns(2)
     cm = confusion_matrix(y, y_pred)
-    fig, ax = plt.subplots(figsize=(4.2, 3.6))
+    fig, ax = plt.subplots(figsize=(3.4, 2.9))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False, ax=ax,
                 xticklabels=["Stay", "Churn"], yticklabels=["Stay", "Churn"])
     ax.set_xlabel("Predicted"); ax.set_ylabel("Actual"); ax.set_title("Confusion matrix")
     c1.pyplot(fig)
     fpr, tpr, _ = roc_curve(y, y_score)
-    fig2, ax2 = plt.subplots(figsize=(4.2, 3.6))
+    fig2, ax2 = plt.subplots(figsize=(3.4, 2.9))
     ax2.plot(fpr, tpr, label=f"AUC = {metrics['AUC']:.3f}")
     ax2.plot([0, 1], [0, 1], "k--", alpha=.4)
     ax2.set_xlabel("False positive rate"); ax2.set_ylabel("True positive rate")
@@ -115,6 +130,7 @@ with tab3:
     st.dataframe(comp.style.format("{:.4f}").highlight_max(axis=0, color="#c6f6d5"),
                  use_container_width=True)
     st.bar_chart(comp[["Accuracy", "AUC", "F1", "MCC"]])
+    st.info(explain_winner(comp, float(y.mean())))
 
 with tab4:
     out = df.copy()
